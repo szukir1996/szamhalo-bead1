@@ -4,7 +4,6 @@ import sys
 from collections import OrderedDict
 from datetime import date
 from subprocess import Popen, PIPE
-from time import sleep
 
 sites = []
 temp = []
@@ -12,33 +11,28 @@ system = platform.system().lower()
 today = date.today().strftime("%Y%m%d")
 dicprocess = {}
 process = []
-dicPing = {}
-dicTrace = {}
+processoutput = []
 
 
-def getjsondata(typeoftool, dictionary):
-    json_data = OrderedDict([
-        ('date', f'{today}'),
-        ('system', f'{system}'),
-        (f'{typeoftool}', [OrderedDict([
-            ('target', t),
-            ('output', o)
-        ]) for t, o in dictionary.items()])
-    ])
+def getjsondata(typeoftool, list):
+    json_data = {
+        "date": f'{today}',
+        "system": f'{system}',
+        f'{typeoftool}': []
+    }
+    for el in list:
+        json_data[f'{typeoftool}'].append(el)
     return json_data
 
 
-def startprocessping(number):
-    for i in range(number):
-        p = Popen(["ping", '-n', '10', sites[i]], stdout=PIPE)
-        dicprocess[f"{p}"] = f"{sites[i]}"
-        process.append(p)
-
-
-def startprocesstrace(number):
-    for i in range(number):
-        p = Popen(["tracert", sites[i]], stdout=PIPE)
-        dicprocess[f"{p}"] = f"{sites[i]}"
+def startprocess(numberofprocesses, tool):
+    for i in range(numberofprocesses):
+        if (tool == "ping"):
+            p = Popen(["ping", '-n', '10', sites[i]], stdout=PIPE)
+        elif (tool == "traceroute"):
+            p = Popen(["tracert", sites[i]], stdout=PIPE)
+        else:
+            return
         process.append(p)
 
 
@@ -54,35 +48,38 @@ else:
     for x in range(len(temp)):
         sites.append(temp[0:len(temp)][x].split(',')[1].split('\n')[0])
 
-startprocessping(20)
+startprocess(20, "ping")
 running = 20
 print("ping processek száma: "f"{running}")
 for x in process:
     if not x is None:
-        dicPing[dicprocess[f"{x}"]] = f"{x.communicate()}"
+        processoutput.append(f"{x.communicate()}")
         x = None
         running = running - 1
         print("ping processek száma: "f"{running}")
 
-with open("ping.json", "w") as write_file_ping:
-    json_data_ping = getjsondata("pings", dicPing)
-    json.dump(json_data_ping, write_file_ping, indent=2)
+temp = [{"target": t, "output": s} for t, s in zip(sites, processoutput)]
 
+with open("ping.json", "w") as write_file_ping:
+    json_data_ping = getjsondata("pings", temp)
+    json.dump(json_data_ping, write_file_ping, indent=2)
 write_file_ping.close()
 
+processoutput = []
 process = []
-startprocesstrace(20)
+startprocess(20, "traceroute")
 running = 20
 print("traceroute processek száma: "f"{running}")
 for x in process:
     if not x is None:
-        dicTrace[dicprocess[f"{x}"]] = f"{x.communicate()}"
+        processoutput.append(f"{x.communicate()}")
         x = None
         running = running - 1
         print("traceroute processek száma: "f"{running}")
 
-with open("traceroute.json", 'w') as write_file_traceroute:
-    json_data_trace = getjsondata("traces", dicTrace)
-    json.dump(json_data_trace, write_file_traceroute, indent=2)
+pings = [{"target": t, "output": s} for t, s in zip(sites, processoutput)]
 
+with open("traceroute.json", 'w') as write_file_traceroute:
+    json_data_trace = getjsondata("traces", pings)
+    json.dump(json_data_trace, write_file_traceroute, indent=2)
 write_file_traceroute.close()
